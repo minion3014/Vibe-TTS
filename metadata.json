@@ -1,0 +1,6 @@
+{
+  "name": "VIBETTS",
+  "description": "Ứng dụng chuyển đổi văn bản thành giọng nói chuyên nghiệp với khả năng tùy chỉnh giọng đọc, tốc độ, tông giọng và tính năng đánh dấu từ đang đọc.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

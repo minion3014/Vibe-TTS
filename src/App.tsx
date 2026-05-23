@@ -518,16 +518,7 @@ export default function App() {
       {/* 2. Main Body Dashboard */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6 relative z-10">
         
-        {/* Dynamic Warning for Speech Synthesis in Iframe */}
-        {!synth && (
-          <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-start gap-3 text-red-300 text-sm">
-            <span className="text-lg">⚠️</span>
-            <div>
-              <p className="font-bold">Trình duyệt không hỗ trợ Web Speech Synthesis</p>
-              <p className="opacity-95 mt-1">Vui lòng thử mở ứng dụng trên các trình duyệt hiện đại như Google Chrome, Microsoft Edge hoặc Safari để trải nghiệm âm thanh.</p>
-            </div>
-          </div>
-        )}
+
 
         {/* Audio Wave Visualizer Row */}
         <AudioVisualizer isPlaying={isPlaying} isPaused={isPaused} speed={rate} charIndex={charIndex} textLength={text.length} />

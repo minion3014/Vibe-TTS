@@ -46,10 +46,18 @@ export default function App() {
   // Smooth scroll tracking function
   const scrollToActiveWord = () => {
     if (activeWordRef.current && scrollContainerRef.current) {
-      activeWordRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-        inline: "nearest"
+      const container = scrollContainerRef.current;
+      const activeWord = activeWordRef.current;
+      
+      const containerRect = container.getBoundingClientRect();
+      const activeRect = activeWord.getBoundingClientRect();
+      
+      const relativeTop = activeRect.top - containerRect.top + container.scrollTop;
+      const targetScrollTop = relativeTop - (containerRect.height / 2) + (activeRect.height / 2);
+      
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: "smooth"
       });
     }
   };
@@ -484,7 +492,7 @@ export default function App() {
       </div>
 
       {/* 1. Elegant Header */}
-      <header className="border-b border-white/5 bg-[#060813]/65 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-white/5 bg-[#060813]/65 backdrop-blur-md relative z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Elegant Volume Speach Speaker Logo Icon */}

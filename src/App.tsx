@@ -319,10 +319,13 @@ export default function App() {
           if (cloudAudioRef.current === audio && !audio.paused) {
             if (wordsList.length > 0) {
               let segmentProgress = 0;
-              const duration = audio.duration;
-              if (duration && !isNaN(duration) && isFinite(duration) && duration > 0) {
-                segmentProgress = audio.currentTime / duration;
+              let duration = audio.duration;
+              if (!duration || isNaN(duration) || !isFinite(duration) || duration <= 0) {
+                // High-fidelity fallback estimate: ~130 WPM (2.2 words per second)
+                const wordCount = wordsList.length || 1;
+                duration = Math.max(1.0, (wordCount / 2.2) + 0.3);
               }
+              segmentProgress = audio.currentTime / duration;
               const currentWordIdx = Math.min(
                 wordsList.length - 1,
                 Math.floor(wordsList.length * segmentProgress)

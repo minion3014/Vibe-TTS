@@ -37,6 +37,7 @@ export default function App() {
   const cloudAudioRef = useRef<HTMLAudioElement | null>(null);
   const activeSegmentIndexRef = useRef<number>(0);
   const segmentsRef = useRef<any[]>([]);
+  const animationFrameRef = useRef<number | null>(null);
 
   // Scroll Container and Active highlight refs for automatic focus & jumping
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -294,7 +295,18 @@ export default function App() {
 
         const segment = segmentsRef.current[idx];
         setCharIndex(segment.startIndex);
-        setCharLength(segment.text.length);
+        setCharLength(0);
+
+        const segmentText = segment.text;
+        const wordsList: { start: number; end: number }[] = [];
+        const regex = /\S+/g;
+        let match;
+        while ((match = regex.exec(segmentText)) !== null) {
+          wordsList.push({
+            start: match.index,
+            end: match.index + match[0].length,
+          });
+        }
 
         const audioUrl = `/api/tts?text=${encodeURIComponent(segment.text)}`;
         const audio = new Audio(audioUrl);
@@ -303,20 +315,47 @@ export default function App() {
         audio.playbackRate = rate;
         audio.volume = volume;
 
+        const updateProgress = () => {
+          if (cloudAudioRef.current === audio && !audio.paused) {
+            if (wordsList.length > 0) {
+              let segmentProgress = 0;
+              const duration = audio.duration;
+              if (duration && !isNaN(duration) && isFinite(duration) && duration > 0) {
+                segmentProgress = audio.currentTime / duration;
+              }
+              const currentWordIdx = Math.min(
+                wordsList.length - 1,
+                Math.floor(wordsList.length * segmentProgress)
+              );
+              const activeWordToken = wordsList[currentWordIdx];
+              if (activeWordToken) {
+                setCharIndex(segment.startIndex + activeWordToken.start);
+                setCharLength(activeWordToken.end - activeWordToken.start);
+              }
+            }
+            animationFrameRef.current = requestAnimationFrame(updateProgress);
+          }
+        };
+
         audio.onplay = () => {
           setIsPlaying(true);
           setIsPaused(false);
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+          }
+          animationFrameRef.current = requestAnimationFrame(updateProgress);
         };
 
-        audio.ontimeupdate = () => {
-          if (audio.duration && audio.duration > 0) {
-            const segmentProgress = audio.currentTime / audio.duration;
-            const segmentCharsRead = Math.round(segment.text.length * segmentProgress);
-            setCharIndex(segment.startIndex + segmentCharsRead);
+        audio.onpause = () => {
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
           }
         };
 
         audio.onended = () => {
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+          }
           setTimeout(() => {
             activeSegmentIndexRef.current += 1;
             playCurrentSegment();
@@ -325,6 +364,9 @@ export default function App() {
 
         audio.onerror = (e) => {
           console.error("Cloud TTS Playback segment Error:", e);
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+          }
           activeSegmentIndexRef.current += 1;
           playCurrentSegment();
         };
@@ -454,15 +496,13 @@ export default function App() {
       );
     }
 
-    const before = text.substring(0, charIndex);
-    const current = text.substring(charIndex, charIndex + charLength);
+    const endPosition = Math.min(text.length, charIndex + charLength);
+    const spokenText = text.substring(0, endPosition);
 
     return (
       <div className="text-slate-200 leading-relaxed font-sans text-base whitespace-pre-wrap select-none animate-fade-in" id="karaoke-text">
-        <span>{before}</span>
-        <span ref={activeWordRef} className="inline-block">
-          {current}
-        </span>
+        <span>{spokenText}</span>
+        <span ref={activeWordRef} className="inline-block w-0 h-0" />
       </div>
     );
   }, [text, charIndex, charLength]);

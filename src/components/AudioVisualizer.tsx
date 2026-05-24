@@ -151,12 +151,6 @@ export default function AudioVisualizer({
           {/* Speaker Text Descriptions */}
           <div className="text-left select-none">
             <div className="flex items-center gap-2">
-              {!isPlaying && (
-                <h3 className="font-bold text-white text-base tracking-tight font-sans flex items-center gap-1.5 animate-fade-in">
-                  <Headphones className="w-4 h-4 text-indigo-400" />
-                  Trình phát âm thanh
-                </h3>
-              )}
             </div>
           </div>
         </div>

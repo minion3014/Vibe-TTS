@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "motion/react";
-import { VoicePreset, HistoryItem, PresetText } from "./types";
+import { HistoryItem, PresetText } from "./types";
 import { PRESET_TEXTS } from "./presets";
 import AudioVisualizer from "./components/AudioVisualizer";
-import VoicePanel from "./components/VoicePanel";
 import TextControlPanel from "./components/TextControlPanel";
 import PlaybackControls from "./components/PlaybackControls";
 import HistoryLog from "./components/HistoryLog";
@@ -18,8 +17,8 @@ export default function App() {
 
   // Voice Tuning Params
   const [rate, setRate] = useState<number>(1.0);
-  const [pitch, setPitch] = useState<number>(1.0);
-  const [volume, setVolume] = useState<number>(1.0);
+  const pitch = 1.0;
+  const volume = 1.0;
 
   // Playback States
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -28,9 +27,9 @@ export default function App() {
   const [charLength, setCharLength] = useState<number>(0);
 
   // Stored preferences & History
-  const [bookmarks, setBookmarks] = useState<VoicePreset[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [autoScroll, setAutoScroll] = useState<boolean>(true);
 
   const synth = typeof window !== "undefined" ? window.speechSynthesis : null;
 
@@ -136,15 +135,12 @@ export default function App() {
       };
     }
 
-    // Load custom presets and history from localStorage
+    // Load custom history from localStorage
     try {
-      const savedPresets = localStorage.getItem("tts_voice_presets");
-      if (savedPresets) setBookmarks(JSON.parse(savedPresets));
-
       const savedHistory = localStorage.getItem("tts_history");
       if (savedHistory) setHistory(JSON.parse(savedHistory));
     } catch (e) {
-      console.error("Failed to load local storage configurations:", e);
+      console.error("Failed to load local storage configuration:", e);
     }
 
     // Clean up active streams on unmount
@@ -156,38 +152,6 @@ export default function App() {
       }
     };
   }, []);
-
-  // Save Bookmarks in storage
-  const handleSaveBookmark = (name: string) => {
-    const newPreset: VoicePreset = {
-      id: crypto.randomUUID(),
-      name,
-      voiceName: selectedVoiceName,
-      rate,
-      pitch,
-      volume,
-    };
-    const updated = [newPreset, ...bookmarks];
-    setBookmarks(updated);
-    localStorage.setItem("tts_voice_presets", JSON.stringify(updated));
-  };
-
-  const handleLoadBookmark = (preset: VoicePreset) => {
-    // Check if the voice still exists in current browser
-    const voiceExists = voices.find((v) => v.name === preset.voiceName);
-    if (voiceExists) {
-      setSelectedVoiceName(preset.voiceName);
-    }
-    setRate(preset.rate);
-    setPitch(preset.pitch);
-    setVolume(preset.volume);
-  };
-
-  const handleDeleteBookmark = (id: string) => {
-    const updated = bookmarks.filter((b) => b.id !== id);
-    setBookmarks(updated);
-    localStorage.setItem("tts_voice_presets", JSON.stringify(updated));
-  };
 
   // History state logic
   const saveToHistory = (txt: string, voiceName: string, speedVal: number, pitchVal: number) => {
@@ -234,7 +198,28 @@ export default function App() {
       setSelectedVoiceName(item.voiceName);
     }
     setRate(item.rate);
-    setPitch(item.pitch);
+  };
+
+  // Auto scroll effect when charIndex updates and autoScroll is enabled
+  useEffect(() => {
+    if (isPlaying && autoScroll) {
+      scrollToActiveWord();
+    }
+  }, [charIndex, autoScroll, isPlaying]);
+
+  const handleToggleSpeed = () => {
+    let nextRate = 1.0;
+    if (rate <= 1.1) {
+      nextRate = 2.0;
+    } else if (rate <= 2.1) {
+      nextRate = 3.0;
+    } else {
+      nextRate = 1.0;
+    }
+    setRate(nextRate);
+    if (cloudAudioRef.current) {
+      cloudAudioRef.current.playbackRate = nextRate;
+    }
   };
 
   const currentWordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
@@ -242,6 +227,8 @@ export default function App() {
   // 2. Playback actions
   const handlePlay = () => {
     if (!text.trim()) return;
+
+    setAutoScroll(true);
 
     if (selectedVoiceName === "Huyền My (Giọng Nữ Studio - Cloud ☁️)") {
       // ----------------------------------------------------
@@ -459,30 +446,29 @@ export default function App() {
 
   // Slice paragraphs / characters to render Highlighted text view in place of editor when speaking starts
   const highlightedTextView = useMemo(() => {
-    if (charIndex < 0 || charIndex >= text.length) {
-      return <p className="text-slate-200 leading-relaxed font-sans whitespace-pre-wrap">{text}</p>;
+    if (charIndex < 0) {
+      return (
+        <div className="text-slate-200 leading-relaxed font-sans text-base whitespace-pre-wrap select-none" id="karaoke-text">
+          <span ref={activeWordRef}></span>
+        </div>
+      );
     }
 
     const before = text.substring(0, charIndex);
     const current = text.substring(charIndex, charIndex + charLength);
-    const after = text.substring(charIndex + charLength);
 
     return (
-      <div className="text-slate-200 leading-relaxed font-sans whitespace-pre-wrap select-none" id="karaoke-text">
-        {before}
-        <span 
-          ref={activeWordRef}
-          className="bg-emerald-500/25 text-emerald-300 font-bold border-b-2 border-emerald-400 px-1 py-0.5 rounded shadow shadow-emerald-500/10 animate-pulse"
-        >
+      <div className="text-slate-200 leading-relaxed font-sans text-base whitespace-pre-wrap select-none animate-fade-in" id="karaoke-text">
+        <span>{before}</span>
+        <span ref={activeWordRef} className="inline-block">
           {current}
         </span>
-        {after}
       </div>
     );
   }, [text, charIndex, charLength]);
 
   return (
-    <div className="min-h-screen bg-[#060813] text-white flex flex-col font-sans select-none antialiased relative overflow-hidden selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="min-h-screen bg-[#060813] text-white flex flex-col font-sans select-none antialiased relative overflow-x-hidden pt-[73px] selection:bg-indigo-500/30 selection:text-indigo-200">
       
       {/* Mesh Gradient Background */}
       <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
@@ -492,7 +478,7 @@ export default function App() {
       </div>
 
       {/* 1. Elegant Header */}
-      <header className="border-b border-white/5 bg-[#060813]/65 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-white/5 bg-[#060813]/85 backdrop-blur-md fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Elegant Volume Speach Speaker Logo Icon */}
@@ -533,91 +519,90 @@ export default function App() {
           wordCount={currentWordCount}
         />
 
-        {/* Content Section Split */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* Left Block: Editor or Real-Time Highlights Player */}
-          <div className="lg:col-span-12 xl:col-span-8 flex flex-col gap-6">
-            {isPlaying ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white/5 backdrop-blur-xl pt-3 pb-5 px-5 rounded-3xl border border-indigo-500/10 shadow-2xl flex flex-col gap-3 relative animate-fade-in"
-              >
-                {/* Clean player panel header with the dismiss button sitting higher */}
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-xs font-bold text-white/50 tracking-wider uppercase flex items-center gap-1.5 select-none">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Đang phát
-                  </span>
-                  
-                  <div className="flex items-center gap-2">
-                    {/* Manual layout adjustment - trigger scroll-to-active with Target icon */}
-                    <button
-                      onClick={scrollToActiveWord}
-                      className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 hover:text-indigo-200 transition-all duration-200 shadow-md cursor-pointer hover:scale-110 active:scale-95 select-none"
-                      title="Cuộn tới từ đang phát"
-                      id="btn-scroll-to-active"
-                    >
-                      <Target className="w-4 h-4 animate-spin-slow" />
-                    </button>
+        {/* 3. Text & Highlights Segment */}
+        <div className="w-full flex flex-col gap-6">
+          {isPlaying ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white/5 backdrop-blur-xl pt-3 pb-5 px-5 rounded-3xl border border-indigo-500/10 shadow-2xl flex flex-col gap-3 relative animate-fade-in"
+            >
+              {/* Clean player panel header with the dismiss button sitting higher */}
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-bold text-white/50 tracking-wider uppercase flex items-center gap-1.5 select-none">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Đang phát
+                </span>
+                
+                <div className="flex items-center gap-2">
+                  {/* Manual layout adjustment - trigger scroll-to-active with Target icon */}
+                  <button
+                    onClick={() => {
+                      setAutoScroll(true);
+                      scrollToActiveWord();
+                    }}
+                    className={`flex items-center justify-center w-8 h-8 rounded-full border text-indigo-300 hover:text-indigo-200 transition-all duration-200 shadow-md cursor-pointer hover:scale-110 active:scale-95 select-none ${
+                      autoScroll 
+                        ? "bg-indigo-500/20 border-indigo-500/50" 
+                        : "bg-indigo-500/10 border-indigo-500/20 opacity-60"
+                    }`}
+                    title="Cuộn tới từ đang phát & Bật lại tự động cuộn"
+                    id="btn-scroll-to-active"
+                  >
+                    <Target className={`w-4 h-4 ${autoScroll ? "animate-spin-slow" : ""}`} />
+                  </button>
 
-                    <button
-                      onClick={handleStop}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 text-xs font-sans font-black transition-all duration-200 shadow-xl cursor-pointer hover:scale-105 active:scale-95 select-none"
-                      title="Tắt trình phát"
-                      id="btn-dismiss-player-panel"
-                    >
-                      <Square className="w-3 h-3 fill-current" />
-                      <span className="hidden sm:inline">Tắt trình phát</span>
-                    </button>
-                  </div>
-                </div>
+                  {/* Dynamic speed rate toggle button (1x, 2x, 3x) - IN THE MIDDLE */}
+                  <button
+                    onClick={handleToggleSpeed}
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 hover:text-indigo-200 transition-all duration-200 shadow-md cursor-pointer hover:scale-110 active:scale-95 select-none text-xs font-mono font-bold"
+                    title={`Tốc độ phát: ${rate.toFixed(0)}x (Nhấp để thay đổi)`}
+                    id="btn-toggle-speed"
+                  >
+                    {rate.toFixed(0)}x
+                  </button>
 
-                {/* Scrollable View Containment */}
-                <div 
-                  ref={scrollContainerRef}
-                  className="bg-[#080b1e]/60 border border-white/5 rounded-2xl p-5 h-85 overflow-y-auto no-scrollbar text-white scroll-smooth"
-                >
-                  {highlightedTextView}
+                  {/* Stop playback button with ONLY the icon (bỏ chữ) */}
+                  <button
+                    onClick={handleStop}
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 transition-all duration-200 shadow-md cursor-pointer hover:scale-110 active:scale-95 select-none"
+                    title="Tắt trình phát"
+                    id="btn-dismiss-player-panel"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                  </button>
                 </div>
-              </motion.div>
-            ) : (
-              <TextControlPanel
-                text={text}
-                onTextChange={setText}
-                onApplyPreset={(p) => {
-                  setText(p.text);
-                  // Set default parameters suited for specific languages
-                  if (p.language === "ja-JP") {
-                    setRate(1.1);
-                  } else {
-                    setRate(1.0);
-                  }
+              </div>
+
+              {/* Scrollable View Containment */}
+              <div 
+                ref={scrollContainerRef}
+                onWheel={() => {
+                  if (isPlaying && autoScroll) setAutoScroll(false);
                 }}
-              />
-            )}
-          </div>
-
-          {/* Right Block: Voice Panel and Parameters Tuning */}
-          <div className="lg:col-span-12 xl:col-span-4 flex flex-col gap-6">
-            <VoicePanel
-              voices={voices}
-              selectedVoiceName={selectedVoiceName}
-              onSelectVoice={setSelectedVoiceName}
-              rate={rate}
-              pitch={pitch}
-              volume={volume}
-              onRateChange={setRate}
-              onPitchChange={setPitch}
-              onVolumeChange={setVolume}
-              isPlaying={isPlaying}
-              bookmarks={bookmarks}
-              onSaveBookmark={handleSaveBookmark}
-              onLoadBookmark={handleLoadBookmark}
-              onDeleteBookmark={handleDeleteBookmark}
+                onTouchMove={() => {
+                  if (isPlaying && autoScroll) setAutoScroll(false);
+                }}
+                className="bg-[#080b1e]/60 border border-white/5 rounded-2xl p-5 h-85 overflow-y-auto no-scrollbar text-white scroll-smooth"
+              >
+                {highlightedTextView}
+              </div>
+            </motion.div>
+          ) : (
+            <TextControlPanel
+              text={text}
+              onTextChange={setText}
+              onApplyPreset={(p) => {
+                setText(p.text);
+                // Set default parameters suited for specific languages
+                if (p.language === "ja-JP") {
+                  setRate(1.1);
+                } else {
+                  setRate(1.0);
+                }
+              }}
             />
-          </div>
+          )}
         </div>
       </main>
 

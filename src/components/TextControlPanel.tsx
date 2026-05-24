@@ -41,9 +41,7 @@ export default function TextControlPanel({
 
   const handleTextAreaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const raw = e.target.value;
-    // Compress multiple redundant vertical line endings / blank lines to a single return to save character budget
-    const compressed = raw.replace(/\n\s*\n+/g, "\n");
-    onTextChange(compressed);
+    onTextChange(raw);
   };
 
   return (
@@ -80,9 +78,9 @@ export default function TextControlPanel({
           <textarea
             value={text}
             onChange={handleTextAreaChange}
-            placeholder="Nhập hoặc dán văn bản của bạn tại đây để phát âm thanh. Tối đa 5000 ký tự (các dòng trống dư thừa sẽ được tự động rút gọn để tiết kiệm dung lượng)..."
+            placeholder="Nhập hoặc dán văn bản của bạn tại đây để phát âm thanh. Tối đa 25000 ký tự (các dòng trống dư thừa sẽ được tự động rút gọn để tiết kiệm dung lượng)..."
             className="w-full h-80 bg-white/5 text-white border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-white/20 resize-none font-sans leading-relaxed no-scrollbar"
-            maxLength={5000}
+            maxLength={25000}
           />
         </div>
 
@@ -90,7 +88,7 @@ export default function TextControlPanel({
         <div className="md:flex justify-between items-center text-xs text-white/40 font-mono border-t border-white/5 pt-3">
           <div className="flex gap-4 mb-2 md:mb-0">
             <span>
-              Ký tự: <strong className="text-white/80">{charCount}</strong><span className="opacity-50">/5000</span>
+              Ký tự: <strong className="text-white/80">{charCount}</strong><span className="opacity-50">/25000</span>
             </span>
             <span>
               Từ: <strong className="text-white/80">{wordCount}</strong>
